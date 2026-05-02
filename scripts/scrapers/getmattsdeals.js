@@ -1,22 +1,29 @@
+// GetMattsDeals shut down. Replaced with Slickdeals coupon/Amazon-specific RSS searches.
 const https = require('https');
 
-const AFFILIATE_TAG = 'amazingd0f292-20';
+// These Slickdeals search feeds are distinct from the main feeds in slickdeals.js
+// They focus specifically on coupon codes and Amazon-only store deals
+const COUPON_FEEDS = [
+  { url: 'https://slickdeals.net/newsearch.php?mode=frontpage&searcharea=deals&searchin=first&rss=1&q=amazon+coupon', label: 'SD coupon' },
+  { url: 'https://slickdeals.net/newsearch.php?mode=frontpage&searcharea=deals&searchin=first&rss=1&q=amazon+promo+code', label: 'SD promo' },
+  { url: 'https://slickdeals.net/newsearch.php?mode=frontpage&searcharea=deals&searchin=first&rss=1&store=amazon', label: 'SD amazon-store' },
+];
 
 function fetchUrl(url) {
   return new Promise((resolve, reject) => {
     const options = {
       headers: {
-        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        'Accept': 'text/html,application/xhtml+xml',
-        'Accept-Language': 'en-US,en;q=0.9',
+        'User-Agent': 'Mozilla/5.0 (compatible; RSS reader)',
+        'Accept': 'application/rss+xml, application/xml, text/xml',
       }
     };
     https.get(url, options, (res) => {
       if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
-        const next = res.headers.location.startsWith('http')
-          ? res.headers.location
-          : `https://www.getmattsdeals.com${res.headers.location}`;
-        return fetchUrl(next).then(resolve).catch(reject);
+        return fetchUrl(res.headers.location).then(resolve).catch(reject);
+      }
+      if (res.statusCode !== 200) {
+        res.resume();
+        return reject(new Error('HTTP ' + res.statusCode));
       }
       let data = '';
       res.on('data', chunk => data += chunk);
@@ -25,30 +32,16 @@ function fetchUrl(url) {
   });
 }
 
-function parseASIN(text) {
-  const patterns = [
-    /amazon\.com\/dp\/([A-Z0-9]{10})/,
-    /amazon\.com\/gp\/product\/([A-Z0-9]{10})/,
-    /\/dp\/([A-Z0-9]{10})/,
-    /asin=([A-Z0-9]{10})/i,
-  ];
-  for (const p of patterns) {
-    const m = text.match(p);
-    if (m) return m[1];
-  }
-  return null;
-}
-
 function parsePrice(text) {
-  const m = text.match(/\$\s*([0-9]+(?:\.[0-9]{2})?)/);
+  const m = text.match(/\$([0-9]+\.[0-9]{2})/);
   return m ? parseFloat(m[1]) : null;
 }
 
 function parseCouponCode(text) {
   const patterns = [
-    /[Cc]ode[:\s]+([A-Z0-9]{4,20})/,
-    /[Pp]romo[:\s]+([A-Z0-9]{4,20})/,
-    /[Cc]oupon[:\s]+([A-Z0-9]{4,20})/,
+    /(?:code|coupon|promo)[:\s]+([A-Z0-9]{4,20})/i,
+    /use\s+code[:\s]+([A-Z0-9]{4,20})/i,
+    /enter\s+(?:code|coupon)[:\s]+([A-Z0-9]{4,20})/i,
   ];
   for (const p of patterns) {
     const m = text.match(p);
@@ -57,108 +50,111 @@ function parseCouponCode(text) {
   return null;
 }
 
-function parseDealsFromHTML(html) {
+function parseCouponInfo(text) {
+  if (/clip\s+(?:the\s+)?coupon|on.page\s+coupon|coupon\s+on\s+(?:the\s+)?product/i.test(text)) {
+    const clipMatch = text.match(/\$([0-9]+(?:\.[0-9]{2})?)\s+off\s+(?:when\s+you\s+)?(?:clip|apply)/i) ||
+                      text.match(/clip\s+the\s+\$([0-9]+(?:\.[0-9]{2})?)\s+coupon/i);
+    return { type: 'clip', amount: clipMatch ? parseFloat(clipMatch[1]) : null };
+  }
+  if (/subscribe\s*&?\s*save|s&s/i.test(text)) {
+    return { type: 'subscribe_save', amount: null };
+  }
+  return null;
+}
+
+// Reuse same Slickdeals RSS parsing logic — same feed format
+function parseSlickdealsRSS(xml) {
   const deals = [];
+  const itemRegex = /<item>([\s\S]*?)<\/item>/g;
+  let match;
 
-  // Extract deal blocks — look for patterns containing Amazon links and prices
-  // getmattsdeals uses Next.js, so deals are rendered in article/div blocks
-  const blockPatterns = [
-    /<article[^>]*>([\s\S]*?)<\/article>/g,
-    /<div[^>]*class="[^"]*deal[^"]*"[^>]*>([\s\S]*?)<\/div>/gi,
-    /<div[^>]*class="[^"]*post[^"]*"[^>]*>([\s\S]*?)<\/div>/gi,
-  ];
+  while ((match = itemRegex.exec(xml)) !== null) {
+    const block = match[1];
 
-  const amazonLinkRegex = /href="(https?:\/\/(?:www\.)?amazon\.com[^"]*?)"/g;
-  const seenAsins = new Set();
+    const titleMatch = block.match(/<title><!\[CDATA\[([\s\S]*?)\]\]><\/title>/) ||
+                       block.match(/<title>([\s\S]*?)<\/title>/);
+    const descMatch = block.match(/<description><!\[CDATA\[([\s\S]*?)\]\]><\/description>/) ||
+                      block.match(/<description>([\s\S]*?)<\/description>/);
+    const contentMatch = block.match(/<content:encoded><!\[CDATA\[([\s\S]*?)\]\]><\/content:encoded>/);
 
-  // Find all Amazon links in the page and extract context around them
-  let linkMatch;
-  while ((linkMatch = amazonLinkRegex.exec(html)) !== null) {
-    const amazonUrl = linkMatch[1];
-    const asin = parseASIN(amazonUrl);
-    if (!asin || seenAsins.has(asin)) continue;
+    if (!titleMatch) continue;
 
-    // Get surrounding context (500 chars before/after)
-    const start = Math.max(0, linkMatch.index - 500);
-    const end = Math.min(html.length, linkMatch.index + 500);
-    const context = html.slice(start, end);
+    const title = titleMatch[1].trim();
+    const desc = descMatch ? descMatch[1] : '';
+    const content = contentMatch ? contentMatch[1] : '';
+    const fullText = title + ' ' + desc + ' ' + content;
 
-    // Strip HTML tags for text extraction
-    const text = context.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ');
+    if (!/data-store-slug="amazon"/i.test(content)) continue;
 
-    const price = parsePrice(text);
+    const asinMatch = content.match(/data-aps-asin="([A-Z0-9]{10})"/);
+    if (!asinMatch) continue;
+    const asin = asinMatch[1];
+
+    const price = parsePrice(title) || parsePrice(desc);
     if (!price || price > 100) continue;
 
-    // Extract title from nearby heading or link text
-    const titleMatch = context.match(/<h[1-6][^>]*>([\s\S]*?)<\/h[1-6]>/) ||
-                       context.match(/title="([^"]+)"/) ||
-                       context.match(/alt="([^"]+)"/);
-    const rawTitle = titleMatch
-      ? titleMatch[1].replace(/<[^>]+>/g, '').trim()
-      : text.slice(0, 100).trim();
+    const imgMatch = content.match(/src="(https:\/\/static\.slickdealscdn\.com\/attachment\/[^"]+\.thumb)"/);
+    const imageUrl = imgMatch ? imgMatch[1] : null;
 
-    if (!rawTitle || rawTitle.length < 5) continue;
+    const couponCode = parseCouponCode(fullText);
+    const couponInfo = parseCouponInfo(fullText);
 
-    const couponCode = parseCouponCode(text);
-    const originalPriceMatch = text.match(/\$\s*([0-9]+(?:\.[0-9]{2})?)\s*(?:was|original|before|retail)/i) ||
-                                text.match(/(?:was|original|before|retail)[:\s]+\$\s*([0-9]+(?:\.[0-9]{2})?)/i);
+    const originalPriceMatch = fullText.match(/list\s+price\s+of\s+\$([0-9]+(?:\.[0-9]{2})?)/i) ||
+                                fullText.match(/(?:was|original|reg(?:ular)?)\s+\$([0-9]+(?:\.[0-9]{2})?)/i);
     const originalPrice = originalPriceMatch
       ? parseFloat(originalPriceMatch[1])
-      : Math.floor(price * (1.3 + Math.random() * 0.15));
+      : Math.round(price * (1.3 + Math.random() * 0.2));
 
-    if (originalPrice <= price) {
-      // skip if no real discount
-    }
+    const cleanTitle = title
+      .replace(/^\$[\d.]+ \| /, '')
+      .replace(/\s+\$[\d.]+$/, '')
+      .replace(/&amp;/g, '&')
+      .trim();
 
-    seenAsins.add(asin);
     deals.push({
       id: asin,
       asin,
-      name: rawTitle.slice(0, 200),
-      url: `https://www.amazon.com/dp/${asin}?tag=${AFFILIATE_TAG}`,
-      originalUrl: `https://www.amazon.com/dp/${asin}`,
+      name: cleanTitle.slice(0, 200),
+      url: 'https://www.amazon.com/dp/' + asin,
+      originalUrl: 'https://www.amazon.com/dp/' + asin,
       price,
-      originalPrice: originalPrice > price ? originalPrice : Math.floor(price * 1.3),
+      originalPrice: originalPrice > price ? originalPrice : Math.round(price * 1.35),
       currency: '$',
-      imageUrl: `https://images-na.ssl-images-amazon.com/images/P/${asin}.01._SCLZZZZZZZ_.jpg`,
+      imageUrl,
       category: 'Deals',
       couponCode,
-      source: 'getmattsdeals',
+      couponType: couponInfo ? couponInfo.type : null,
+      couponAmount: couponInfo ? couponInfo.amount : null,
+      source: 'slickdeals',
       rating: null,
       reviewCount: null,
       scrapedAt: new Date().toISOString(),
       status: 'pending',
     });
   }
-
   return deals;
 }
 
 async function scrapeGetMattsDeals() {
-  const pages = [
-    'https://www.getmattsdeals.com',
-    'https://www.getmattsdeals.com/top-daily-deals',
-  ];
-
   const allDeals = [];
   const seenAsins = new Set();
-  console.log('  Fetching GetMattsDeals...');
+  console.log('  Fetching Slickdeals coupon/Amazon feeds...');
 
-  for (const url of pages) {
+  for (const feed of COUPON_FEEDS) {
     try {
-      const html = await fetchUrl(url);
-      const deals = parseDealsFromHTML(html);
+      const xml = await fetchUrl(feed.url);
+      const deals = parseSlickdealsRSS(xml);
       for (const deal of deals) {
         if (!seenAsins.has(deal.asin)) {
           seenAsins.add(deal.asin);
           allDeals.push(deal);
         }
       }
-      console.log(`  GetMattsDeals (${url.includes('top') ? 'top deals' : 'home'}): ${deals.length} deals`);
+      console.log('  Slickdeals (' + feed.label + '): ' + deals.length + ' Amazon deals');
     } catch (err) {
-      console.warn(`  GetMattsDeals failed: ${err.message}`);
+      console.warn('  Slickdeals (' + feed.label + ') failed: ' + err.message);
     }
-    await new Promise(r => setTimeout(r, 800));
+    await new Promise(r => setTimeout(r, 500));
   }
 
   return allDeals;

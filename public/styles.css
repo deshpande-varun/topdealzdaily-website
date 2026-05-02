@@ -436,6 +436,33 @@ header {
     font-weight: 600;
 }
 
+.coupon-badge {
+    margin: 8px 0 4px;
+    padding: 6px 10px;
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: 600;
+    line-height: 1.4;
+}
+
+.coupon-code {
+    background: #fef9c3;
+    color: #78350f;
+    border: 1px solid #fde68a;
+}
+
+.coupon-clip {
+    background: #ecfdf5;
+    color: #065f46;
+    border: 1px solid #6ee7b7;
+}
+
+.coupon-sns {
+    background: #eff6ff;
+    color: #1e40af;
+    border: 1px solid #bfdbfe;
+}
+
 .shop-btn {
     display: block;
     width: 100%;

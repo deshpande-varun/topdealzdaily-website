@@ -59,16 +59,24 @@ async function runAll() {
     seenToday.add(deal.asin);
     todayDeals.push({
       ...deal,
-      url: 'https://www.amazon.com/dp/' + deal.asin + '?tag=' + AFFILIATE_TAG,
+      url: 'https://www.amazon.com/dp/' + deal.asin + '?tag=' + AFFILIATE_TAG + '&linkCode=ogi&th=1&psc=1',
     });
   }
 
   console.log('New deals today: ' + todayDeals.length);
 
-  // Remove from existing any ASINs we're refreshing today, then prepend today's deals.
-  // If over cap, drop the oldest from the tail.
+  // Prioritise today's fresh deals at the top. For any existing deal with the same ASIN,
+  // update its price/coupon but keep it at the top alongside today's new ones.
+  // Deals with coupon info float above plain deals within each day's batch.
   const existingFiltered = existingDeals.filter(d => !seenToday.has(d.asin));
-  const merged = [...todayDeals, ...existingFiltered].slice(0, MAX_TOTAL);
+  const sortedToday = [...todayDeals].sort((a, b) => {
+    const aHasCoupon = !!(a.couponCode || a.couponType);
+    const bHasCoupon = !!(b.couponCode || b.couponType);
+    if (aHasCoupon && !bHasCoupon) return -1;
+    if (!aHasCoupon && bHasCoupon) return 1;
+    return 0;
+  });
+  const merged = [...sortedToday, ...existingFiltered].slice(0, MAX_TOTAL);
 
   console.log('Total after merge: ' + merged.length + ' deals (dropped ' +
     Math.max(0, todayDeals.length + existingFiltered.length - MAX_TOTAL) + ' oldest)');

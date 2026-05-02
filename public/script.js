@@ -219,6 +219,30 @@ function createDealCard(deal) {
         priceDiv.appendChild(badge);
     }
 
+    // Coupon badge — shown above the shop button
+    if (deal.couponCode) {
+      const couponDiv = document.createElement('div');
+      couponDiv.className = 'coupon-badge coupon-code';
+      couponDiv.textContent = '🏷️ Use code ';
+      const strong = document.createElement('strong');
+      strong.textContent = deal.couponCode;
+      couponDiv.appendChild(strong);
+      const tail = document.createTextNode(' at checkout');
+      couponDiv.appendChild(tail);
+      content.appendChild(couponDiv);
+    } else if (deal.couponType === 'clip') {
+      const couponDiv = document.createElement('div');
+      couponDiv.className = 'coupon-badge coupon-clip';
+      const amtText = deal.couponAmount ? ' ($' + deal.couponAmount.toFixed(2) + ' off)' : '';
+      couponDiv.textContent = '✂️ Clip coupon on Amazon page' + amtText;
+      content.appendChild(couponDiv);
+    } else if (deal.couponType === 'subscribe_save') {
+      const couponDiv = document.createElement('div');
+      couponDiv.className = 'coupon-badge coupon-sns';
+      couponDiv.textContent = '🔁 Extra savings with Subscribe & Save';
+      content.appendChild(couponDiv);
+    }
+
     const shopBtn = document.createElement('a');
     shopBtn.href = deal.url;
     shopBtn.className = 'shop-btn';
