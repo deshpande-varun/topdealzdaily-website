@@ -15,7 +15,7 @@ function generateInstagramCaption(deal) {
   caption += `💰 Now $${deal.price.toFixed(2)}\n`;
   caption += `⭐ ${deal.rating} stars (${deal.reviewCount?.toLocaleString() || 'N/A'} reviews)\n\n`;
   caption += `🚨 Comment "LINK" & I'll send you the direct Amazon link\n\n`;
-  caption += `Follow @amazingdeals_17 for daily Amazon deals you don't want to miss! 👇\n\n`;
+  caption += `Follow @topdealzzdaily for daily Amazon deals you don't want to miss! 👇\n\n`;
   caption += config.instagramConfig.hashtags.map(tag => `#${tag}`).join(' ');
 
   return caption;
