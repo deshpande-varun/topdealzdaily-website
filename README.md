@@ -1,100 +1,82 @@
-# Amazing Deals 🔥
+# topdealzdaily.com 🔥
 
-Daily Amazon deals website with Instagram integration for [@amazingdeals_17](https://instagram.com/amazingdeals_17)
+Daily Amazon deals website with Instagram auto-posting for [@topdealzzdaily](https://instagram.com/topdealzzdaily)
 
 ## Features
 
-✅ **Public Website** - Instagram-style grid showing all deals  
-✅ **Admin Dashboard** - Manage and prepare Instagram posts  
-✅ **Automated Scraping** - Daily Amazon deals up to $100  
-✅ **Instagram Post Prep** - One-click caption + image download  
-✅ **Affiliate Integration** - Amazon Associates tracking  
-✅ **Smart Filtering** - By category, price, and search  
+✅ **Public Website** - Deal grid at topdealzdaily.com
+✅ **Automated Scraping** - 100+ Amazon deals/day from bestsellers, Slickdeals, GetMattsDeals
+✅ **Instagram Auto-Posting** - Branded feed post + story per deal, fully automated
+✅ **Affiliate Integration** - Amazon Associates tracking
+✅ **Smart Filtering** - Prioritises coupons and highest % discount
 
 ## Tech Stack
 
 - **Frontend:** HTML, CSS, JavaScript (vanilla)
-- **Backend:** Node.js + Express
-- **Scraping:** Apify API
+- **Scraping:** Node.js (direct Amazon + RSS)
+- **Image Generation:** `canvas` npm package
 - **Hosting:** Vercel (free tier)
-- **Scheduling:** node-cron
+- **Scheduling:** GitHub Actions (9am UTC daily)
+- **Instagram:** Meta Graph API
 
-## Setup Instructions
+## Setup
 
 ### 1. Install Dependencies
 
 ```bash
-cd amazingdeals17-website
+cd topdealzdaily-website
 npm install
 ```
 
-### 2. Configure Environment
-
-Create `.env` file in the root directory:
-
-```
-APIFY_TOKEN=your_apify_token_here
-PORT=3000
-```
-
-### 3. Run Locally
-
-```bash
-npm start
-```
-
-- **Public site:** http://localhost:3000
-- **Admin panel:** http://localhost:3000/admin
-
-### 4. Test Scraper
+### 2. Run Scraper Locally
 
 ```bash
 npm run scrape
 ```
 
-## Daily Workflow
+### 3. Post to Instagram Manually
 
-1. **Morning (9 AM)** - Auto-scraper runs and fetches 50 new deals
-2. **Review Deals** - Open admin panel, review new deals
-3. **Prepare Posts** - Click "Prepare Post" for deals you like
-4. **Post to Instagram:**
-   - Caption auto-copied
-   - Image downloaded
-   - Paste in Instagram app
-   - Mark as posted
+```bash
+INSTAGRAM_ACCESS_TOKEN=your_token node scripts/post-instagram.js
+```
+
+## Daily Pipeline
+
+```
+9am UTC → GitHub Actions → npm run scrape → commit deals.json → vercel --prod → post-instagram.js
+```
 
 ## Configuration
 
-Edit `data/config.json` to customize:
-
-- Price range
-- Categories
-- Scrape schedule
-- Instagram caption template
-- Affiliate tag
-
-## Deployment to Vercel
-
-1. Push to GitHub
-2. Import repo in Vercel
-3. Add environment variable: `APIFY_TOKEN`
-4. Deploy!
+Edit `data/config.json` to update affiliate tag, price range, categories.
 
 ## File Structure
 
 ```
-amazingdeals17-website/
-├── public/           # Public website
-├── admin/            # Admin dashboard
-├── api/              # Express server
-├── scripts/          # Scraping & post prep
-├── data/             # JSON data files
-└── images/           # Product images
+topdealzdaily-website/
+├── public/                    # Public website
+├── admin/                     # Admin dashboard
+├── scripts/
+│   ├── scrape-all.js          # Daily scraper orchestrator
+│   ├── scrapers/              # Amazon, Slickdeals, GetMattsDeals scrapers
+│   ├── post-instagram.js      # Instagram auto-poster
+│   ├── create-deal-image.js   # Feed + story image generator
+│   └── create-reel-video.js   # Reel video generator (not in daily run)
+├── data/
+│   ├── deals.json             # Accumulated deals (up to 1000)
+│   ├── posted.json            # ASINs already posted to Instagram
+│   └── config.json            # Affiliate tag, site config
+└── images/                    # Profile pictures, deal images
 ```
+
+## GitHub Secrets Required
+
+- `VERCEL_TOKEN`, `VERCEL_PROJECT_ID`, `VERCEL_ORG_ID`
+- `INSTAGRAM_ACCESS_TOKEN` — expires every 60 days, renew at Meta Developer dashboard
 
 ## Support
 
-Questions? DM [@amazingdeals_17](https://instagram.com/amazingdeals_17)
+Questions? DM [@topdealzzdaily](https://instagram.com/topdealzzdaily)
 
 ---
 

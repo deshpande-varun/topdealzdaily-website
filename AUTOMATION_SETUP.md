@@ -8,7 +8,7 @@ This runs automatically in the cloud every day at 9 AM UTC.
 
 ### Step 1: Add Apify Token to GitHub Secrets
 
-1. Go to your repository: https://github.com/deshpande-varun/amazingdeals17-website
+1. Go to your repository: https://github.com/deshpande-varun/topdealzdaily-website
 2. Click **Settings** → **Secrets and variables** → **Actions**
 3. Click **New repository secret**
 4. Name: `APIFY_TOKEN`
@@ -53,14 +53,14 @@ Run a Claude agent on your machine that updates deals daily.
 crontab -e
 
 # Add this line (runs at 9 AM daily)
-0 9 * * * cd ~/Desktop/amazingdeals17-website && npm run scrape && git add data/deals.json && git commit -m "Auto-update deals" && git push
+0 9 * * * cd ~/Desktop/topdealzdaily-website && npm run scrape && git add data/deals.json && git commit -m "Auto-update deals" && git push
 ```
 
 2. **Or** use the Claude Code `/loop` skill:
 
 ```bash
 # In Claude Code CLI, navigate to the project
-cd ~/Desktop/amazingdeals17-website
+cd ~/Desktop/topdealzdaily-website
 
 # Run scraper every 24 hours
 /loop 24h "run npm run scrape, commit the changes, and push to github"
@@ -104,15 +104,15 @@ export default async function handler(req, res) {
 ## 🔍 Monitoring
 
 ### Check GitHub Actions Status:
-- Visit: https://github.com/deshpande-varun/amazingdeals17-website/actions
+- Visit: https://github.com/deshpande-varun/topdealzdaily-website/actions
 - See recent runs and any errors
 
 ### Check Vercel Deployments:
-- Visit: https://vercel.com/vds-projects-f8f56f7c/amazingdeals17-website
+- Visit: https://vercel.com/vds-projects-f8f56f7c/topdealzdaily-website
 - See automatic deployments triggered by GitHub pushes
 
 ### Check Deal Updates:
-- API: https://amazingdeals17-website.vercel.app/api/stats
+- API: https://topdealzdaily-website.vercel.app/api/stats
 - Shows `lastScrape` timestamp
 
 ---

@@ -1,7 +1,7 @@
 {
-  "name": "amazingdeals17-website",
+  "name": "topdealzdaily-website",
   "version": "1.0.0",
-  "description": "Amazon deals website",
+  "description": "Amazon deals website — topdealzdaily.com",
   "type": "commonjs",
   "scripts": {
     "scrape": "node scripts/scrape-all.js"
