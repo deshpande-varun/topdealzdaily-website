@@ -5,5 +5,8 @@
   "type": "commonjs",
   "scripts": {
     "scrape": "node scripts/scrape-all.js"
+  },
+  "dependencies": {
+    "canvas": "^3.2.3"
   }
 }
