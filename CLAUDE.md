@@ -20,7 +20,7 @@ Wife (H4 EAD) — all accounts, income, and Instagram are in her name. Varun is 
 - `scripts/scrapers/getmattsdeals.js` — GetMattsDeals → ASINs + coupon codes
 - `scripts/post-instagram.js` — auto-posts 3 deals/day to Instagram (feed post + story each)
 - `scripts/create-deal-image.js` — generates branded 1080x1080 feed and 1080x1920 story images using `canvas`
-- `scripts/create-reel-video.js` — Reels video generator (Ken Burns ffmpeg effect) — NOT wired into daily run, kept for future use
+- `scripts/create-reel-video.js` — DELETED. Reels were built (Ken Burns ffmpeg zoom effect) but removed — the static image design didn't translate well to video. Revisit with a proper motion design if needed.
 - `data/config.json` — affiliate tag, price range, site config
 - `data/deals.json` — accumulated deals (up to 1000, newest first)
 - `data/posted.json` — tracks ASINs already posted to Instagram (prevents duplicates)
@@ -89,11 +89,22 @@ To update: change `affiliateTag` in `data/config.json`
 1. Wife's Amazon Associates account approval → update `affiliateTag` in `data/config.json`
 2. Attorney confirmation on H1B/H4 EAD business structure
 3. Renew Instagram access token before ~July 4 2026
-4. Reels auto-posting — `scripts/create-reel-video.js` exists (Ken Burns ffmpeg effect) but was disabled — revisit when design is improved
+4. Reels — revisit with a proper motion design (previous attempt: Ken Burns zoom on static image — looked bad, was removed)
+5. Follower growth strategies to explore: consistent posting cadence, engage with deal/savings community, collaborate with other deal accounts, use trending audio on stories
+
+## npm / CI Gotcha — IMPORTANT
+- **Never commit `package-lock.json`** — it is gitignored. The dev machine runs inside Salesforce's network which routes npm through an internal proxy (`nexus-proxy.repo.local.sfdc.net`). This URL gets baked into the lockfile and breaks GitHub Actions (runner can't reach it). GitHub Actions generates a fresh lockfile on each run from the public npm registry.
+- If you ever need to run `npm install` locally for this project, it will work fine — but never commit the resulting `package-lock.json`.
 
 ## Known Gotchas
 - Amazon image URLs: `/images/I/` = reliable. `/images/P/` = blank/broken — filter these out
 - Imgur upload: `Authorization: Client-ID xxx` must go in HTTP **headers** via `extraHeaders`, NOT in the POST body
 - Instagram Stories: must set `media_type: 'STORIES'` on the container, otherwise it posts as a feed image
 - Canvas text baseline: a 50px font extends ~40px above baseline — card bottom must be at least 60px above first name baseline or text overlaps the card
-- ffmpeg on this Mac (Homebrew) does NOT have `drawtext` filter compiled in — bake all text into canvas frame before passing to ffmpeg
+- ffmpeg (Homebrew on Mac) does NOT have `drawtext` filter compiled in — bake all text into canvas frame before passing to ffmpeg
+- Instagram Reels via Graph API: video must be hosted at a publicly accessible URL. Imgur supports MP4 upload (base64, same Client-ID). transfer.sh is unreachable from this network.
+
+## Working With Claude On This Project
+- Use a **personal Claude account** (claude.ai or Claude Code CLI with personal Anthropic API key) — do NOT use a work/corporate Claude instance
+- The project is entirely personal — GitHub, Vercel, Instagram, Amazon Associates are all in wife's name
+- When picking up a new session, read this file first — it has everything needed to continue without re-explaining context
