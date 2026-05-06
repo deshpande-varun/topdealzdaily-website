@@ -28,19 +28,6 @@ jobs:
       - name: Run scraper
         run: npm run scrape
 
-      - name: Get current date
-        id: date
-        run: echo "DATE=$(date +%Y-%m-%d)" >> $GITHUB_OUTPUT
-
-      - name: Commit and push if changes
-        env:
-          COMMIT_DATE: ${{ steps.date.outputs.DATE }}
-        run: |
-          git config --local user.email "github-actions[bot]@users.noreply.github.com"
-          git config --local user.name "github-actions[bot]"
-          git add data/deals.json
-          git diff --quiet && git diff --staged --quiet || (git commit -m "Auto-update deals - ${COMMIT_DATE}" && git push)
-
       - name: Deploy to Vercel
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
@@ -53,9 +40,9 @@ jobs:
           INSTAGRAM_ACCESS_TOKEN: ${{ secrets.INSTAGRAM_ACCESS_TOKEN }}
         run: node scripts/post-instagram.js
 
-      - name: Commit posted.json
-        env:
-          COMMIT_DATE: ${{ steps.date.outputs.DATE }}
+      - name: Commit deals.json and posted.json
         run: |
-          git add data/posted.json
-          git diff --quiet && git diff --staged --quiet || (git commit -m "Update posted deals - ${COMMIT_DATE}" && git push)
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          git add data/deals.json data/posted.json
+          git diff --quiet && git diff --staged --quiet || (git commit -m "Auto-update deals and posted - $(date +%Y-%m-%d)" && git push)
