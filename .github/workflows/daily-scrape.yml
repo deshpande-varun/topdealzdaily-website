@@ -2,7 +2,7 @@ name: Daily Deals Scraper
 
 on:
   schedule:
-    # Runs every day at 9 AM UTC (adjust timezone as needed)
+    # Runs every day at 9 AM UTC
     - cron: '0 9 * * *'
   workflow_dispatch: # Allows manual trigger
 
@@ -27,14 +27,6 @@ jobs:
 
       - name: Run scraper
         run: npm run scrape
-
-      - name: Deploy to Vercel
-        uses: amondnet/vercel-action@v25
-        with:
-          vercel-token: ${{ secrets.VERCEL_TOKEN }}
-          vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
-          vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }}
-          vercel-args: '--prod'
 
       - name: Post deals to Instagram
         env:
