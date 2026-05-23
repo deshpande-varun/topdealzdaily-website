@@ -109,27 +109,34 @@ async function postDeal(deal) {
 
   if (!fs.existsSync(IMAGES_DIR)) fs.mkdirSync(IMAGES_DIR, { recursive: true });
 
+  let feedPostId = null;
+  let storyPostId = null;
+
   // Generate and post feed image
   console.log(`  Generating feed image...`);
   const feedPath = path.join(IMAGES_DIR, `${deal.asin}-feed.jpg`);
   await createDealImage(deal, feedPath);
   const feedUrl = await uploadToImgur(feedPath);
   const caption = buildCaption(deal);
-  const feedPostId = await publishInstagramMedia(feedUrl, caption, 'IMAGE');
+  feedPostId = await publishInstagramMedia(feedUrl, caption, 'IMAGE');
   fs.unlinkSync(feedPath);
   console.log(`  Feed post published: ${feedPostId}`);
 
   // Wait before posting story
   await new Promise(r => setTimeout(r, 5000));
 
-  // Generate and post story
-  console.log(`  Generating story image...`);
-  const storyPath = path.join(IMAGES_DIR, `${deal.asin}-story.jpg`);
-  await createStoryImage(deal, storyPath);
-  const storyUrl = await uploadToImgur(storyPath);
-  const storyPostId = await publishInstagramMedia(storyUrl, null, 'STORY');
-  fs.unlinkSync(storyPath);
-  console.log(`  Story published: ${storyPostId}`);
+  // Try to post story, but don't fail if it errors (to avoid duplicate feeds)
+  try {
+    console.log(`  Generating story image...`);
+    const storyPath = path.join(IMAGES_DIR, `${deal.asin}-story.jpg`);
+    await createStoryImage(deal, storyPath);
+    const storyUrl = await uploadToImgur(storyPath);
+    storyPostId = await publishInstagramMedia(storyUrl, null, 'STORY');
+    fs.unlinkSync(storyPath);
+    console.log(`  Story published: ${storyPostId}`);
+  } catch (storyErr) {
+    console.error(`  Story failed (feed still posted): ${storyErr.message}`);
+  }
 
   return { feedPostId, storyPostId };
 }
@@ -176,13 +183,21 @@ async function main() {
       console.log(`\nPosting: ${deal.name.slice(0, 60)}`);
       const { feedPostId, storyPostId } = await postDeal(deal);
       posted.push({ asin: deal.asin, name: deal.name, feedPostId, storyPostId, postedAt: new Date().toISOString() });
-      console.log(`  Done.`);
+
+      if (feedPostId && storyPostId) {
+        console.log(`  ✓ Done (feed + story)`);
+      } else if (feedPostId) {
+        console.log(`  ⚠ Done (feed only, story failed)`);
+      } else {
+        console.log(`  ✗ Partial failure`);
+      }
+
       successCount++;
       if (candidates.indexOf(deal) < candidates.length - 1) {
         await new Promise(r => setTimeout(r, 30000));
       }
     } catch (err) {
-      console.error(`  Failed: ${deal.name.slice(0, 50)} — ${err.message}`);
+      console.error(`  ✗ Failed completely: ${deal.name.slice(0, 50)} — ${err.message}`);
       lastError = err;
     }
   }
