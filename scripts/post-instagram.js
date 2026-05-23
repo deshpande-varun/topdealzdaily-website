@@ -85,7 +85,10 @@ async function publishInstagramMedia(imgUrl, caption, mediaType = 'IMAGE') {
     '/v19.0/' + INSTAGRAM_ACCOUNT_ID + '/media',
     containerBody
   );
-  if (container.error) throw new Error(container.error.message);
+  if (container.error) {
+    console.error('Instagram API Error:', JSON.stringify(container.error));
+    throw new Error(`${container.error.message} (code: ${container.error.code}, type: ${container.error.type})`);
+  }
 
   await new Promise(r => setTimeout(r, 8000));
 
@@ -93,7 +96,10 @@ async function publishInstagramMedia(imgUrl, caption, mediaType = 'IMAGE') {
     creation_id: container.id,
     access_token: ACCESS_TOKEN,
   });
-  if (result.error) throw new Error(result.error.message);
+  if (result.error) {
+    console.error('Instagram Publish Error:', JSON.stringify(result.error));
+    throw new Error(`${result.error.message} (code: ${result.error.code})`);
+  }
   return result.id;
 }
 
@@ -162,22 +168,32 @@ async function main() {
 
   console.log(`Posting ${candidates.length} deals to @topdealzzdaily (feed + story each)...`);
 
+  let successCount = 0;
+  let lastError = null;
+
   for (const deal of candidates) {
     try {
       console.log(`\nPosting: ${deal.name.slice(0, 60)}`);
       const { feedPostId, storyPostId } = await postDeal(deal);
       posted.push({ asin: deal.asin, name: deal.name, feedPostId, storyPostId, postedAt: new Date().toISOString() });
       console.log(`  Done.`);
+      successCount++;
       if (candidates.indexOf(deal) < candidates.length - 1) {
         await new Promise(r => setTimeout(r, 30000));
       }
     } catch (err) {
       console.error(`  Failed: ${deal.name.slice(0, 50)} — ${err.message}`);
+      lastError = err;
     }
   }
 
   fs.writeFileSync(POSTED_FILE, JSON.stringify(posted, null, 2));
   console.log(`\nDone. ${posted.length} total deals posted to Instagram.`);
+  console.log(`Success: ${successCount}/${candidates.length} posts`);
+
+  if (successCount === 0 && candidates.length > 0) {
+    throw new Error(`All posts failed. Last error: ${lastError?.message || 'Unknown'}`);
+  }
 }
 
 main().catch(e => { console.error(e.message); process.exit(1); });
