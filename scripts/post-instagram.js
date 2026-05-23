@@ -8,7 +8,7 @@ const { createDealImage, createStoryImage } = require('./create-deal-image');
 
 const INSTAGRAM_ACCOUNT_ID = '17841428043117890';
 const ACCESS_TOKEN = process.env.INSTAGRAM_ACCESS_TOKEN;
-const MAX_POSTS = 3;
+const MAX_POSTS = 2;
 const DEALS_FILE = path.join(__dirname, '../data/deals.json');
 const POSTED_FILE = path.join(__dirname, '../data/posted.json');
 const IMAGES_DIR = path.join(__dirname, '../images/deals');
