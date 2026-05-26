@@ -32,6 +32,12 @@ jobs:
         env:
           INSTAGRAM_ACCESS_TOKEN: ${{ secrets.INSTAGRAM_ACCESS_TOKEN }}
         run: node scripts/post-instagram.js
+        continue-on-error: true
+
+      - name: Sync posted.json with Instagram
+        env:
+          INSTAGRAM_ACCESS_TOKEN: ${{ secrets.INSTAGRAM_ACCESS_TOKEN }}
+        run: node scripts/sync-posted.js
 
       - name: Commit deals.json and posted.json
         run: |
