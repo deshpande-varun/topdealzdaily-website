@@ -9,6 +9,11 @@ on:
 permissions:
   contents: write
 
+# Prevent concurrent workflow runs to avoid duplicate posts
+concurrency:
+  group: instagram-posting
+  cancel-in-progress: false
+
 jobs:
   scrape-deals:
     runs-on: ubuntu-latest

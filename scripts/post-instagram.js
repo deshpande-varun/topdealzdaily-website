@@ -66,6 +66,8 @@ function buildCaption(deal) {
   else if (deal.couponType === 'clip') caption += `✂️ Clip coupon on Amazon page\n`;
   caption += '\n🛒 Link in bio!\n\nFollow @topdealzzdaily for daily Amazon deals! 👇\n\n';
   caption += '#amazondeal #deals #sale #shopping #amazon #discount #dealoftheday #savemoney #onlineshopping #bargain';
+  // Add ASIN as hidden tracking tag for exact duplicate detection
+  caption += ` #ASIN${deal.asin}`;
   return caption;
 }
 
@@ -211,34 +213,57 @@ async function runPosting() {
   // Fetch recent Instagram posts to double-check for duplicates
   console.log('Checking Instagram for recent posts...');
   const igPosts = await getRecentInstagramPosts();
-  const igCaptions = igPosts.map(p => (p.caption || '').toLowerCase());
 
-  // Extract product names from Instagram captions (first line after 🔥)
-  const igProductNames = igCaptions.map(caption => {
-    const firstLine = caption.split('\n')[0].replace('🔥 ', '').trim();
-    return firstLine.substring(0, 50).toLowerCase();
+  // If Instagram API fails, we MUST abort to prevent duplicates
+  if (igPosts.length === 0 && posted.length > 0) {
+    console.error('⚠️  SAFETY CHECK FAILED: Could not fetch Instagram posts.');
+    console.error('⚠️  This could mean the API is down or rate limited.');
+    console.error('⚠️  Aborting to prevent duplicate posts.');
+    console.error(`⚠️  posted.json has ${posted.length} entries, but Instagram returned 0 posts.`);
+    console.error('⚠️  If Instagram truly has 0 posts, manually delete posted.json and re-run.');
+    throw new Error('Instagram API check failed - aborting to prevent duplicates');
+  }
+
+  // Extract ASINs from Instagram captions using the #ASINXXXXXXX tag
+  const igAsins = new Set();
+  igPosts.forEach(post => {
+    const caption = post.caption || '';
+    const asinMatch = caption.match(/#ASIN([A-Z0-9]{10})/);
+    if (asinMatch) {
+      igAsins.add(asinMatch[1]);
+    }
   });
+
+  console.log(`Found ${igAsins.size} ASINs in Instagram feed (from ${igPosts.length} posts)`);
 
   const postedAsins = new Set(posted.map(p => p.asin));
 
-  // Filter out deals that are already on Instagram (even if not in posted.json)
+  // Filter out deals that are already on Instagram
   const candidates = deals
     .filter(d => {
       if (!d.imageUrl || !d.imageUrl.includes('/images/I/')) return false;
-      if (postedAsins.has(d.asin)) return false;
 
-      // Check if this deal is already on Instagram by matching product name
-      const dealName = d.name.substring(0, 50).toLowerCase();
-      const alreadyOnIG = igProductNames.some(igName =>
-        (igName.length > 10 && dealName.includes(igName.substring(0, 30))) ||
-        (dealName.length > 10 && igName.includes(dealName.substring(0, 30)))
-      );
-
-      if (alreadyOnIG) {
-        console.log(`  Skipping ${d.asin} - already on Instagram`);
+      // Check both posted.json AND Instagram feed
+      if (postedAsins.has(d.asin)) {
+        console.log(`  Skipping ${d.asin} - in posted.json`);
+        return false;
       }
 
-      return !alreadyOnIG;
+      if (igAsins.has(d.asin)) {
+        console.log(`  Skipping ${d.asin} - already on Instagram (not in posted.json - will sync)`);
+        // Add to posted.json immediately to fix the discrepancy
+        posted.push({
+          asin: d.asin,
+          name: d.name,
+          feedPostId: null,
+          storyPostId: null,
+          postedAt: new Date().toISOString(),
+          source: 'found-on-ig-during-safety-check'
+        });
+        return false;
+      }
+
+      return true;
     })
     .sort((a, b) => {
       const aHasCoupon = !!(a.couponCode || a.couponType);
