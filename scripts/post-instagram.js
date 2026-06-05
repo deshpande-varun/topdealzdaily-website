@@ -12,6 +12,7 @@ const MAX_POSTS = 1;
 const DEALS_FILE = path.join(__dirname, '../data/deals.json');
 const POSTED_FILE = path.join(__dirname, '../data/posted.json');
 const IMAGES_DIR = path.join(__dirname, '../images/deals');
+const LOCK_FILE = path.join(__dirname, '../data/post-instagram.lock');
 
 function apiPost(hostname, urlPath, body, extraHeaders = {}) {
   return new Promise((resolve, reject) => {
@@ -141,11 +142,65 @@ async function postDeal(deal) {
   return { feedPostId, storyPostId };
 }
 
+async function getRecentInstagramPosts() {
+  return new Promise((resolve, reject) => {
+    const url = `/v19.0/${INSTAGRAM_ACCOUNT_ID}/media?fields=id,caption,timestamp&limit=30&access_token=${ACCESS_TOKEN}`;
+    https.get({ hostname: 'graph.facebook.com', path: url }, (res) => {
+      let data = '';
+      res.on('data', c => data += c);
+      res.on('end', () => {
+        try {
+          const json = JSON.parse(data);
+          if (json.error) {
+            console.warn('Warning: Could not fetch Instagram posts:', json.error.message);
+            resolve([]);
+          } else {
+            resolve(json.data || []);
+          }
+        } catch (e) {
+          console.warn('Warning: Error parsing Instagram response:', e.message);
+          resolve([]);
+        }
+      });
+    }).on('error', (e) => {
+      console.warn('Warning: Network error fetching Instagram posts:', e.message);
+      resolve([]);
+    });
+  });
+}
+
 async function main() {
   if (!ACCESS_TOKEN) {
     console.error('INSTAGRAM_ACCESS_TOKEN env var not set');
     process.exit(1);
   }
+
+  // Check for lock file to prevent concurrent runs
+  if (fs.existsSync(LOCK_FILE)) {
+    const lockAge = Date.now() - fs.statSync(LOCK_FILE).mtimeMs;
+    if (lockAge < 600000) { // 10 minutes
+      console.log('Another instance is running (lock file exists). Exiting.');
+      process.exit(0);
+    } else {
+      console.log('Stale lock file found (>10 min old). Removing and continuing.');
+      fs.unlinkSync(LOCK_FILE);
+    }
+  }
+
+  // Create lock file
+  fs.writeFileSync(LOCK_FILE, new Date().toISOString());
+
+  try {
+    await runPosting();
+  } finally {
+    // Always remove lock file when done
+    if (fs.existsSync(LOCK_FILE)) {
+      fs.unlinkSync(LOCK_FILE);
+    }
+  }
+}
+
+async function runPosting() {
 
   const deals = JSON.parse(fs.readFileSync(DEALS_FILE));
   let posted = [];
@@ -153,10 +208,38 @@ async function main() {
     posted = JSON.parse(fs.readFileSync(POSTED_FILE));
   }
 
+  // Fetch recent Instagram posts to double-check for duplicates
+  console.log('Checking Instagram for recent posts...');
+  const igPosts = await getRecentInstagramPosts();
+  const igCaptions = igPosts.map(p => (p.caption || '').toLowerCase());
+
+  // Extract product names from Instagram captions (first line after 🔥)
+  const igProductNames = igCaptions.map(caption => {
+    const firstLine = caption.split('\n')[0].replace('🔥 ', '').trim();
+    return firstLine.substring(0, 50).toLowerCase();
+  });
+
   const postedAsins = new Set(posted.map(p => p.asin));
 
+  // Filter out deals that are already on Instagram (even if not in posted.json)
   const candidates = deals
-    .filter(d => d.imageUrl && d.imageUrl.includes('/images/I/') && !postedAsins.has(d.asin))
+    .filter(d => {
+      if (!d.imageUrl || !d.imageUrl.includes('/images/I/')) return false;
+      if (postedAsins.has(d.asin)) return false;
+
+      // Check if this deal is already on Instagram by matching product name
+      const dealName = d.name.substring(0, 50).toLowerCase();
+      const alreadyOnIG = igProductNames.some(igName =>
+        (igName.length > 10 && dealName.includes(igName.substring(0, 30))) ||
+        (dealName.length > 10 && igName.includes(dealName.substring(0, 30)))
+      );
+
+      if (alreadyOnIG) {
+        console.log(`  Skipping ${d.asin} - already on Instagram`);
+      }
+
+      return !alreadyOnIG;
+    })
     .sort((a, b) => {
       const aHasCoupon = !!(a.couponCode || a.couponType);
       const bHasCoupon = !!(b.couponCode || b.couponType);
@@ -211,4 +294,11 @@ async function main() {
   }
 }
 
-main().catch(e => { console.error(e.message); process.exit(1); });
+main().catch(e => {
+  console.error(e.message);
+  // Clean up lock file on error
+  if (fs.existsSync(LOCK_FILE)) {
+    fs.unlinkSync(LOCK_FILE);
+  }
+  process.exit(1);
+});
