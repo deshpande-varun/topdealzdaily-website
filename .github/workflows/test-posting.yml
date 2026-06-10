@@ -1,0 +1,58 @@
+name: Test Instagram Posting
+
+on:
+  workflow_dispatch: # Manual trigger only
+
+permissions:
+  contents: write
+
+jobs:
+  test-posting:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run scraper
+        run: npm run scrape
+
+      - name: Post deals to Instagram (with full output)
+        env:
+          INSTAGRAM_ACCESS_TOKEN: ${{ secrets.INSTAGRAM_ACCESS_TOKEN }}
+        run: |
+          echo "=== RUNNING INSTAGRAM POSTING ===="
+          node scripts/post-instagram.js
+          echo "=== POSTING COMPLETE ==="
+
+      - name: Sync posted.json with Instagram
+        env:
+          INSTAGRAM_ACCESS_TOKEN: ${{ secrets.INSTAGRAM_ACCESS_TOKEN }}
+        run: node scripts/sync-posted.js
+
+      - name: Show changes
+        run: |
+          echo "=== GIT STATUS ==="
+          git status
+          echo ""
+          echo "=== CHANGES TO deals.json ==="
+          git diff data/deals.json | head -50 || echo "No changes"
+          echo ""
+          echo "=== CHANGES TO posted.json ==="
+          git diff data/posted.json || echo "No changes"
+
+      - name: Commit deals.json and posted.json
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          git add data/deals.json data/posted.json
+          TIMESTAMP="$(date +%Y-%m-%d-%H%M%S)"
+          git diff --quiet && git diff --staged --quiet || (git commit -m "Test post - ${TIMESTAMP}" && git push)
