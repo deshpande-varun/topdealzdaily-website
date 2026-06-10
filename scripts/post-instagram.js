@@ -288,6 +288,10 @@ async function runPosting() {
 
   if (candidates.length === 0) {
     console.log('No new deals to post today.');
+    console.log(`  Total deals in deals.json: ${deals.length}`);
+    console.log(`  Deals with Amazon /images/I/ URLs: ${deals.filter(d => d.imageUrl && d.imageUrl.includes('/images/I/')).length}`);
+    console.log(`  Already posted (in posted.json): ${posted.length}`);
+    console.log(`  Already posted (found on Instagram): ${igAsins.size}`);
     return;
   }
 
