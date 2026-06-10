@@ -8,6 +8,7 @@ const { createDealImage, createStoryImage } = require('./create-deal-image');
 
 const INSTAGRAM_ACCOUNT_ID = '17841428043117890';
 const ACCESS_TOKEN = process.env.INSTAGRAM_ACCESS_TOKEN;
+const DRY_RUN = process.env.DRY_RUN === 'true';
 const MAX_POSTS = 1;
 const DEALS_FILE = path.join(__dirname, '../data/deals.json');
 const POSTED_FILE = path.join(__dirname, '../data/posted.json');
@@ -119,24 +120,38 @@ async function postDeal(deal) {
   console.log(`  Generating feed image...`);
   const feedPath = path.join(IMAGES_DIR, `${deal.asin}-feed.jpg`);
   await createDealImage(deal, feedPath);
-  const feedUrl = await uploadToImgur(feedPath);
-  const caption = buildCaption(deal);
-  feedPostId = await publishInstagramMedia(feedUrl, caption, 'IMAGE');
-  fs.unlinkSync(feedPath);
-  console.log(`  Feed post published: ${feedPostId}`);
+
+  if (DRY_RUN) {
+    console.log(`  [DRY RUN] Would upload to Imgur and post to Instagram`);
+    console.log(`  [DRY RUN] Image saved at: ${feedPath}`);
+    feedPostId = 'DRY_RUN_FEED_ID';
+  } else {
+    const feedUrl = await uploadToImgur(feedPath);
+    const caption = buildCaption(deal);
+    feedPostId = await publishInstagramMedia(feedUrl, caption, 'IMAGE');
+    fs.unlinkSync(feedPath);
+    console.log(`  Feed post published: ${feedPostId}`);
+  }
 
   // Wait before posting story
-  await new Promise(r => setTimeout(r, 5000));
+  await new Promise(r => setTimeout(r, DRY_RUN ? 100 : 5000));
 
   // Try to post story, but don't fail if it errors (to avoid duplicate feeds)
   try {
     console.log(`  Generating story image...`);
     const storyPath = path.join(IMAGES_DIR, `${deal.asin}-story.jpg`);
     await createStoryImage(deal, storyPath);
-    const storyUrl = await uploadToImgur(storyPath);
-    storyPostId = await publishInstagramMedia(storyUrl, null, 'STORY');
-    fs.unlinkSync(storyPath);
-    console.log(`  Story published: ${storyPostId}`);
+
+    if (DRY_RUN) {
+      console.log(`  [DRY RUN] Would upload to Imgur and post story to Instagram`);
+      console.log(`  [DRY RUN] Image saved at: ${storyPath}`);
+      storyPostId = 'DRY_RUN_STORY_ID';
+    } else {
+      const storyUrl = await uploadToImgur(storyPath);
+      storyPostId = await publishInstagramMedia(storyUrl, null, 'STORY');
+      fs.unlinkSync(storyPath);
+      console.log(`  Story published: ${storyPostId}`);
+    }
   } catch (storyErr) {
     console.error(`  Story failed (feed still posted): ${storyErr.message}`);
   }
@@ -172,6 +187,11 @@ async function getRecentInstagramPosts() {
 }
 
 async function main() {
+  if (DRY_RUN) {
+    console.log('🧪 DRY RUN MODE - No actual posts will be made to Instagram');
+    console.log('');
+  }
+
   if (!ACCESS_TOKEN) {
     console.error('INSTAGRAM_ACCESS_TOKEN env var not set');
     process.exit(1);
@@ -324,8 +344,13 @@ async function runPosting() {
     }
   }
 
-  fs.writeFileSync(POSTED_FILE, JSON.stringify(posted, null, 2));
-  console.log(`\nDone. ${posted.length} total deals posted to Instagram.`);
+  if (DRY_RUN) {
+    console.log(`\n[DRY RUN] Would save ${posted.length} entries to posted.json (not saving)`);
+    console.log(`[DRY RUN] Generated images are in: ${IMAGES_DIR}`);
+  } else {
+    fs.writeFileSync(POSTED_FILE, JSON.stringify(posted, null, 2));
+    console.log(`\nDone. ${posted.length} total deals posted to Instagram.`);
+  }
   console.log(`Success: ${successCount}/${candidates.length} posts`);
 
   if (successCount === 0 && candidates.length > 0) {
