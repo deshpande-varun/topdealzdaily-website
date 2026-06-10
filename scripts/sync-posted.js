@@ -15,7 +15,7 @@ if (!ACCESS_TOKEN) {
   process.exit(0);
 }
 
-const url = `/v19.0/${INSTAGRAM_ACCOUNT_ID}/media?fields=id,caption,timestamp&limit=50&access_token=${ACCESS_TOKEN}`;
+const url = `/v19.0/${INSTAGRAM_ACCOUNT_ID}/media?fields=id,caption,timestamp&limit=50&access_token=${encodeURIComponent(ACCESS_TOKEN)}`;
 
 https.get({ hostname: 'graph.facebook.com', path: url }, (res) => {
   let data = '';
