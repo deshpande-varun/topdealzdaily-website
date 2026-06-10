@@ -155,18 +155,18 @@ async function getRecentInstagramPosts() {
           const json = JSON.parse(data);
           if (json.error) {
             console.warn('Warning: Could not fetch Instagram posts:', json.error.message);
-            resolve([]);
+            resolve({ success: false, posts: [] });
           } else {
-            resolve(json.data || []);
+            resolve({ success: true, posts: json.data || [] });
           }
         } catch (e) {
           console.warn('Warning: Error parsing Instagram response:', e.message);
-          resolve([]);
+          resolve({ success: false, posts: [] });
         }
       });
     }).on('error', (e) => {
       console.warn('Warning: Network error fetching Instagram posts:', e.message);
-      resolve([]);
+      resolve({ success: false, posts: [] });
     });
   });
 }
@@ -212,16 +212,26 @@ async function runPosting() {
 
   // Fetch recent Instagram posts to double-check for duplicates
   console.log('Checking Instagram for recent posts...');
-  const igPosts = await getRecentInstagramPosts();
+  const igResult = await getRecentInstagramPosts();
 
-  // If Instagram API fails, we MUST abort to prevent duplicates
-  if (igPosts.length === 0 && posted.length > 0) {
-    console.error('⚠️  SAFETY CHECK FAILED: Could not fetch Instagram posts.');
-    console.error('⚠️  This could mean the API is down or rate limited.');
+  // If Instagram API fails AND we have posted items, abort to prevent duplicates
+  // But if API succeeds with 0 posts (or few posts), that's OK - stories expire after 24h
+  if (!igResult.success && posted.length > 0) {
+    console.error('⚠️  SAFETY CHECK FAILED: Instagram API returned an error.');
+    console.error('⚠️  This could mean the API is down, rate limited, or token expired.');
     console.error('⚠️  Aborting to prevent duplicate posts.');
-    console.error(`⚠️  posted.json has ${posted.length} entries, but Instagram returned 0 posts.`);
-    console.error('⚠️  If Instagram truly has 0 posts, manually delete posted.json and re-run.');
+    console.error(`⚠️  posted.json has ${posted.length} entries, but Instagram API failed.`);
     throw new Error('Instagram API check failed - aborting to prevent duplicates');
+  }
+
+  const igPosts = igResult.posts;
+
+  // If API succeeded but returned 0 posts and we have 52 in posted.json, that's fine
+  // Stories expire after 24h, so feed posts might be old/deleted
+  if (igResult.success && igPosts.length === 0 && posted.length > 0) {
+    console.log(`✓ Instagram API succeeded but returned 0 recent posts`);
+    console.log(`  This is normal - stories expire after 24h and old feed posts may be deleted`);
+    console.log(`  Will use posted.json (${posted.length} entries) for duplicate prevention`);
   }
 
   // Extract ASINs from Instagram captions using the #ASINXXXXXXX tag
