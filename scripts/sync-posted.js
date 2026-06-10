@@ -29,8 +29,18 @@ https.get({ hostname: 'graph.facebook.com', path: url }, (res) => {
       }
 
       const igPosts = json.data || [];
+
+      // If Instagram returns 0 posts, that's OK - nothing to sync
+      if (igPosts.length === 0) {
+        console.log('Instagram returned 0 posts, nothing to sync');
+        process.exit(0);
+      }
+
       const deals = JSON.parse(fs.readFileSync(DEALS_FILE));
-      const posted = JSON.parse(fs.readFileSync(POSTED_FILE));
+      let posted = [];
+      if (fs.existsSync(POSTED_FILE)) {
+        posted = JSON.parse(fs.readFileSync(POSTED_FILE));
+      }
       const postedAsins = new Set(posted.map(p => p.asin));
 
       const newPosts = [];
