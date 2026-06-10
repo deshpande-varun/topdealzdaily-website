@@ -28,8 +28,9 @@ jobs:
       - name: Post deals to Instagram (with full output)
         env:
           INSTAGRAM_ACCESS_TOKEN: ${{ secrets.INSTAGRAM_ACCESS_TOKEN }}
+          DRY_RUN: 'true'
         run: |
-          echo "=== RUNNING INSTAGRAM POSTING ===="
+          echo "=== RUNNING INSTAGRAM POSTING (DRY RUN) ===="
           node scripts/post-instagram.js
           echo "=== POSTING COMPLETE ==="
 
